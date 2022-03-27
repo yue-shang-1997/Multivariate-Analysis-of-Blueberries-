@@ -1,0 +1,297 @@
+---
+title: "Multivariate Analysis of Blueberries (PCA)"
+author: "Yue Shang, Rongtao Ding"
+date: "10/1/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Genotype(bluberry)
+```{r}
+require(gdata)
+genotype<- read.xls ("/Users/mac/Desktop/flavor_data/genotype.xlsx", sheet = 1, header = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+
+genotype %>% 
+  select(4,21:88)->genotype1 
+genotype2<-genotype1[,-c(12,17,37,43,47)]
+genotype3<-genotype2 %>% 
+  select(-Methyl.salicylate,-X.E..2.Hexenyl.valerate,-Eugenol) 
+#genotype3[is.na(genotype3)]<-mean(genotype3,na.rm=T)
+#mean(genotype3)
+genotype4<-map(c(2:61),~as.numeric(genotype3[,.]))
+genotype4<-as.data.frame(genotype4)
+genotype5=apply(genotype4,2, function(x){
+  x[is.na(x)]=mean(x,na.rm=T)
+  return(x)
+})
+```
+
+```{r}
+name3<-colnames(genotype3)
+colnames(genotype5)<-name3[-1]
+genotype6<-genotype5[,-c(11,34,39,42)]
+genotype6<-as.data.frame(genotype6)
+genotype6$Genotype<-genotype3$Genotype
+genotype7<-aggregate(x=genotype6[,-57], by=list(genotype6$Genotype),FUN=mean)
+names(genotype7)[1]<-"Genotype"
+```
+
+
+#Sample_Code(results)
+```{r}
+dir_result = "/Users/mac/Desktop/flavor_data/result"   
+result_file_list = list.files(path = dir_result, pattern = "*.CSV", recursive = TRUE, full.names = TRUE)  
+```
+
+```{r}
+library(dplyr)
+result_file_list %>%
+  lapply(read.csv) %>%
+  bind_rows -> result
+result1<-result[,-c(1,2,4,13,14,21:23)]
+samplecode1<-aggregate(x=scale(result1[,-1]),by=list(result$Samp.Desc),FUN=mean)
+names(samplecode1)[1]<-"Genotype"
+```
+
+#merge
+```{r}
+total<-merge(samplecode1,genotype7,by="Genotype")
+total1<-total[-c(7,16,20),-c(11,12,13,14,15,29,39,40,41,42,50,55,63,68,69)]
+head(total1,10)
+```
+```{r}
+#write.csv(x=total1,file = "total1.csv")
+```
+
+
+#PCA
+```{r}
+library("factoextra")
+```
+
+```{r}
+library("FactoMineR")
+score.pca <- PCA(total1[,2:10], graph = FALSE,scale.unit =F)
+score.pca$var$cor
+score.pca$ind
+sum(score.pca$var$cor[,1]*total1[1,2:4])
+
+score.pca1<- prcomp(total1[,2:10])
+score.pca1$x
+score.pca1$rotation
+
+```
+
+```{r}
+eig.val <- get_eigenvalue(score.pca)
+eig.val
+```
+
+```{r}
+fviz_eig(score.pca, addlabels = TRUE, ylim = c(0, 70))
+```
+
+```{r}
+var1 <- get_pca_var(score.pca)
+var1
+```
+
+```{r fig.height=15, fig.width=15}
+fviz_pca_var(score.pca, col.var = "black",repel = TRUE ,labelsize = 10 ) +
+   theme(text = element_text(size = 50),
+         axis.title = element_text(size = 50),
+         axis.text = element_text(size = 50)
+         )
+```
+
+```{r}
+library("corrplot")
+corrplot(var1$cos2, is.corr=FALSE)
+```
+
+```{r}
+score.pca$eig
+```
+
+```{r fig.height=15, fig.width=15}
+fviz_pca_var(score.pca, col.var = "contrib",
+     gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+     repel = TRUE,
+     labelsize = 10
+     ) +
+   theme(text = element_text(size = 50),
+         axis.title = element_text(size = 50),
+         axis.text = element_text(size = 50),
+         legend.text =  element_text(size = 30),
+         legend.key.size=unit(.4,"inches"),
+         legend.key.height=unit(.7,"inches"),
+         legend.key.width=unit(.7,"inches")
+         )
+
+```
+
+```{r}
+ind <- get_pca_ind(score.pca)
+ind
+```
+
+```{r}
+fviz_pca_ind(score.pca,
+             col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     
+             )
+```
+```{r fig.width=7}
+fviz_pca_biplot(score.pca, repel = TRUE,
+                col.var = "#2E9FDF", 
+                col.ind = "#696969",  
+                )
+```
+
+
+```{r}
+fviz_pca_ind(score.pca, pointsize = "cos2", 
+             pointshape = 21, fill = "#E7B800",
+             repel = TRUE)
+```
+
+
+
+```{r}
+c.pca <- PCA(total1[,11:56], graph = FALSE)
+c.pca$var$cor
+```
+
+```{r}
+eig.val2 <- get_eigenvalue(c.pca)
+head(eig.val2,10)
+```
+
+```{r}
+fviz_eig(c.pca, addlabels = TRUE, ylim = c(0, 50))
+```
+
+
+```{r fig.height=20, fig.width=10}
+var2 <- get_pca_var(c.pca)
+corrplot(var2$coord)
+```
+
+```{r fig.height=15, fig.width=15, message=FALSE, paged.print=FALSE}
+fviz_pca_var(c.pca, col.var = "black",repel = TRUE,labelsize = 10 ) +
+   theme(text = element_text(size = 50),
+         axis.title = element_text(size = 50),
+         axis.text = element_text(size = 50)
+         )
+```
+
+
+```{r fig.height=15, fig.width=15}
+fviz_pca_var(c.pca, col.var = "contrib",
+     gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+     repel = TRUE,
+     labelsize = 10
+     ) +
+   theme(text = element_text(size = 50),
+         axis.title = element_text(size = 50),
+         axis.text = element_text(size = 50),
+         legend.text =  element_text(size = 30),
+         legend.key.size=unit(.4,"inches"),
+         legend.key.height=unit(.7,"inches"),
+         legend.key.width=unit(.7,"inches")
+         )
+```
+
+```{r}
+ind <- get_pca_ind(c.pca)
+ind
+```
+
+```{r}
+fviz_pca_ind(c.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+             )
+```
+
+```{r fig.width=7}
+fviz_pca_biplot(c.pca, repel = TRUE,
+                col.var = "#2E9FDF", # Variables color
+                col.ind = "#696969"  # Individuals color
+                )
+```
+
+```{r}
+fviz_pca_ind(c.pca, pointsize = "cos2", 
+             pointshape = 21, fill = "#E7B800",
+             repel = TRUE)
+```
+
+```{r}
+#install.packages("FactoMineR")
+library(scatterplot3d)
+library(FactoMineR)
+dat = total1[,2:10]
+dat.pca = PCA(dat,graph = F)
+a = dat.pca[["ind"]][["coord"]] 
+colors <- c("#FFB6C1", "#FFF0F5", "#FF1493", "#DA70D6", "#FF00FF", 
+            "#8B008B", "#BA55D3", "#4B0082", "#7B68EE", "#E6E6FA",
+            "#0000CD","#00008B", "#4169E1","#778899", "#F0F8FF",
+            "#87CEEB", "#ADD8E6", "#5F9EA0", "#E1FFFF", "#00FFFF",
+            "#00CED1", "#008B8B","#48D1CC","#40E0D0","#00FA9A",
+            "#F5FFFA")
+p3 = scatterplot3d(a[1:26,1:3],main="blueberries",pch = 21,bg=colors)
+legend("bottom",col = "black", legend = total1$Genotype[1:11],pt.bg =  colors, pch = 21,inset = -0.5, xpd = TRUE, horiz = TRUE)
+```
+#没用的3dplot,仅欣赏
+```{r}
+#library(FactoMineR)
+#dat = iris[,1:4]
+#dat.pca = PCA(dat,graph = F)
+#a = dat.pca[["ind"]][["coord"]] 
+#colors <- c("#999999", "#E69F00", "#56B4E9")
+#p3 = scatterplot3d(a[,1:3],main="iris",pch = 21,color = colors)
+#legend("bottom",col = "black", legend = levels(iris$Species),pt.bg =  my_color, pch = 21,
+#       inset = -0.2, xpd = TRUE, horiz = TRUE)
+```
+
+# 3D plot-genotype
+```{r}
+library(plotly)
+dimdata<-as.data.frame(c.pca$var$cor) 
+dimdata$gene<-row.names(dimdata)
+
+fig <- plot_ly(dimdata, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,color = ~gene)
+fig <- fig %>% add_markers()
+fig <- fig %>% layout(scene = list(xaxis = list(title = 'Dimension1'),
+                     yaxis = list(title = 'Dimension2'),
+                     zaxis = list(title = 'Dimension3')))
+
+fig
+```
+
+# 3D plot-genotype
+
+```{r}
+library(plotly)
+dimdata2<-as.data.frame(score.pca$var$cor) 
+dimdata2$score<-row.names(dimdata2)
+
+fig2 <- plot_ly(dimdata2, x = ~Dim.1, y = ~Dim.2, z = ~Dim.3,color = ~score)
+fig2 <- fig2 %>% add_markers()
+fig2 <- fig2 %>% layout(scene = list(xaxis = list(title = 'Dimension1'),
+                     yaxis = list(title = 'Dimension2'),
+                     zaxis = list(title = 'Dimension3')))
+
+fig2
+```
